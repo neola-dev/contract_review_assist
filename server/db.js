@@ -67,8 +67,9 @@ export const db = {
 
   getAllContracts: (userId) => {
     const data = readDB();
+    if (!userId) return [];
     return data.contracts
-      .filter(c => c.userId === userId || (!c.userId)) // Keep old contracts visible if no userId for backward compatibility
+      .filter(c => c.userId && c.userId === userId)
       .map(c => {
       // populate versions array minimally
       const versions = data.versions
@@ -88,7 +89,8 @@ export const db = {
 
   getContractById: (contractId, userId) => {
     const data = readDB();
-    const contract = data.contracts.find(c => c.id === contractId && (c.userId === userId || !c.userId));
+    if (!userId) return null;
+    const contract = data.contracts.find(c => c.id === contractId && c.userId && c.userId === userId);
     if (!contract) return null;
     
     const versions = data.versions
@@ -108,18 +110,20 @@ export const db = {
 
   getVersionById: (versionId, userId) => {
     const data = readDB();
+    if (!userId) return null;
     const version = data.versions.find(v => v.id === versionId) || null;
     if (!version) return null;
     
     // Verify user owns the contract
     const contract = data.contracts.find(c => c.id === version.contractId);
-    if (!contract || (contract.userId && contract.userId !== userId)) return null;
+    if (!contract || !contract.userId || contract.userId !== userId) return null;
     
     return version;
   },
 
   createContract: (title, contractType, userId) => {
     const data = readDB();
+    if (!userId) throw new Error("User ID required to create contract");
     const newContract = {
       id: generateId('C'),
       userId,
@@ -136,7 +140,8 @@ export const db = {
 
   addVersion: (contractId, fileName, analysisData, userId) => {
     const data = readDB();
-    const contract = data.contracts.find(c => c.id === contractId && (c.userId === userId || !c.userId));
+    if (!userId) throw new Error("Access denied: User ID required");
+    const contract = data.contracts.find(c => c.id === contractId && c.userId && c.userId === userId);
     if (!contract) throw new Error("Contract not found or access denied");
 
     const newVersionNumber = contract.latestVersionNumber + 1;

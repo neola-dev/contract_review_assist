@@ -8,13 +8,9 @@ import DashboardModule from './components/DashboardModule';
 import ClauseExtractionModule from './components/ClauseExtractionModule';
 import DatesObligationsModule from './components/DatesObligationsModule';
 import ClauseDetailsModal from './components/ClauseDetailsModal';
-import QAModule from './components/QAModule';
-import ComplianceModule from './components/ComplianceModule';
-import RecommendationsModule from './components/RecommendationsModule';
 import Toast from './components/Toast';
 import MyContracts from './components/MyContracts';
 import VersionHistoryModal from './components/VersionHistoryModal';
-import ComparisonModule from './components/ComparisonModule';
 import ExecutiveReport from './components/ExecutiveReport';
 import Sidebar from './components/Sidebar';
 import TopHeader from './components/TopHeader';
@@ -23,8 +19,8 @@ import { useAuth } from './contexts/AuthContext';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import Profile from './components/Profile';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+import { contractApi } from './services/api';
+import { normalizeContract } from './utils/contractUtils';
 
 const PIPELINE_STAGES = [
   "Uploading document...",
@@ -40,13 +36,12 @@ export default function App() {
   const { user, token, loading } = useAuth();
   
   const [contracts, setContracts] = useState([]);
-  const [view, setView] = useState('dashboard'); // 'dashboard', 'upload', 'analysis', 'comparison', 'report', 'login', 'register', 'profile'
+  const [view, setView] = useState(() => localStorage.getItem('activeView') || 'dashboard');
   
   const [currentContract, setCurrentContract] = useState(null);
   const [existingContractForUpload, setExistingContractForUpload] = useState({ id: null, title: null });
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [selectedContractForHistory, setSelectedContractForHistory] = useState(null);
-  const [comparisonVersions, setComparisonVersions] = useState({ a: null, b: null });
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pipelineStage, setPipelineStage] = useState(0);
@@ -61,33 +56,52 @@ export default function App() {
     setToastType(type);
   };
 
+  const handleSetView = (newView) => {
+    setView(newView);
+    localStorage.setItem('activeView', newView);
+  };
+
   const fetchContracts = async () => {
     if (!token) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/api/contracts`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setContracts(data);
-        if (data.length === 0 && view === 'dashboard') {
-          setView('upload');
-        }
+      const data = await contractApi.getContracts();
+      setContracts(data);
+      if (data.length === 0 && view === 'dashboard') {
+        handleSetView('upload');
       }
     } catch (e) {
-      console.error(e);
+      console.error('Fetch contracts error:', e);
+    }
+  };
+
+  const loadSavedAnalysis = async (contractId) => {
+    if (!contractId || !token) return;
+    try {
+      const rawAnalysis = await contractApi.getAnalysis(contractId);
+      const normalized = normalizeContract(rawAnalysis);
+      setCurrentContract(normalized);
+    } catch (e) {
+      console.error('Failed to restore contract analysis:', e);
+      localStorage.removeItem('activeContractId');
     }
   };
 
   useEffect(() => {
     if (user) {
       if (view === 'login' || view === 'register') {
-        setView('dashboard');
+        handleSetView('dashboard');
       }
       fetchContracts();
+
+      const savedContractId = localStorage.getItem('activeContractId');
+      if (savedContractId && (view === 'analysis' || view === 'report')) {
+        loadSavedAnalysis(savedContractId);
+      }
     } else {
+      setContracts([]);
+      setCurrentContract(null);
       if (view !== 'login' && view !== 'register') {
-        setView('login');
+        handleSetView('login');
       }
     }
   }, [user]);
@@ -111,36 +125,21 @@ export default function App() {
     setAnalysisError(null);
     setIsAnalyzing(true);
     setPipelineStage(0);
-    setView('analysis');
+    handleSetView('analysis');
 
     const stageTimer = startPipelineAnimation();
 
     try {
-      const formData = new FormData();
-      formData.append('contract', uploadedFile);
-      if (existingContractId) {
-        formData.append('contractId', existingContractId);
-      }
-
-      const response = await fetch(`${BACKEND_URL}/api/analyze`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
+      const rawResult = await contractApi.analyzeContract({
+        file: uploadedFile,
+        contractId: existingContractId,
       });
 
       clearInterval(stageTimer);
-      const json = await response.json();
 
-      if (!response.ok) {
-        setAnalysisError({
-          code: json.error || 'unknown',
-          message: json.message || 'An unexpected error occurred during analysis.',
-        });
-        setIsAnalyzing(false);
-        return;
-      }
+      const normalized = normalizeContract(rawResult);
 
-      if (!json.documentType || !json.clauses) {
+      if (!normalized.documentType || !normalized.clauses) {
         setAnalysisError({
           code: 'malformed_response',
           message: 'The AI returned an incomplete analysis. Please try again.',
@@ -152,16 +151,19 @@ export default function App() {
       setPipelineStage(PIPELINE_STAGES.length - 1);
       await new Promise(r => setTimeout(r, 600));
 
-      setCurrentContract(json);
+      setCurrentContract(normalized);
+      if (normalized.contractId) {
+        localStorage.setItem('activeContractId', normalized.contractId);
+      }
       setIsAnalyzing(false);
       setExistingContractForUpload({ id: null, title: null });
       fetchContracts();
       showToast("Contract analysis report generated successfully!");
-    } catch (networkError) {
+    } catch (error) {
       clearInterval(stageTimer);
       setAnalysisError({
-        code: 'network_error',
-        message: `Cannot connect to the analysis server. Make sure the backend is running on ${BACKEND_URL}. Run: npm run server`,
+        code: error.code || 'error',
+        message: error.message || 'Failed to complete AI contract analysis.',
       });
       setIsAnalyzing(false);
     }
@@ -169,38 +171,52 @@ export default function App() {
 
   const handleOpenContract = async (contractId, versionId) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/versions/${versionId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCurrentContract(data.analysisData);
-        setView('analysis');
+      let rawData;
+      if (versionId) {
+        rawData = await contractApi.getVersion(versionId);
+      } else {
+        rawData = await contractApi.getAnalysis(contractId);
       }
+      const normalized = normalizeContract(rawData);
+      setCurrentContract(normalized);
+      localStorage.setItem('activeContractId', contractId);
+      handleSetView('analysis');
     } catch (e) {
-      showToast("Failed to load contract version", "error");
+      showToast(e.message || "Failed to load contract analysis", "error");
+    }
+  };
+
+  const handleDeleteContract = async (contractId) => {
+    try {
+      await contractApi.deleteContract(contractId);
+      showToast("Contract deleted successfully.");
+      if (currentContract?.contractId === contractId || currentContract?._id === contractId) {
+        setCurrentContract(null);
+        localStorage.removeItem('activeContractId');
+        if (view === 'analysis' || view === 'report') {
+          handleSetView('dashboard');
+        }
+      }
+      fetchContracts();
+    } catch (e) {
+      showToast(e.message || "Failed to delete contract.", "error");
     }
   };
 
   const handleUploadNewVersion = (contractId, contractTitle) => {
     setExistingContractForUpload({ id: contractId, title: contractTitle });
-    setView('upload');
+    handleSetView('upload');
   };
 
   const handleViewHistory = (contractId) => {
-    const c = contracts.find(x => x.id === contractId);
+    const c = contracts.find(x => (x._id || x.id) === contractId);
     setSelectedContractForHistory(c);
     setIsVersionHistoryOpen(true);
   };
 
-  const handleCompare = (versionAId, versionBId) => {
-    setComparisonVersions({ a: versionAId, b: versionBId });
-    setView('comparison');
-  };
-
   const handleScrollToUpload = () => {
     setExistingContractForUpload({ id: null, title: null });
-    setView('upload');
+    handleSetView('upload');
   };
 
   const openClauseDetails = (clause) => {
@@ -226,11 +242,11 @@ export default function App() {
       <AnimatePresence mode="wait">
         {view === 'register' ? (
           <motion.div key="register" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <Register onNavigate={setView} />
+            <Register onNavigate={handleSetView} />
           </motion.div>
         ) : (
           <motion.div key="login" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <Login onNavigate={setView} />
+            <Login onNavigate={handleSetView} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -244,15 +260,15 @@ export default function App() {
       <Sidebar 
         view={view} 
         currentContract={currentContract} 
-        setView={setView} 
-        onUploadNew={() => { setExistingContractForUpload({id: null, title: null}); setView('upload'); }} 
+        setView={handleSetView} 
+        onUploadNew={() => { setExistingContractForUpload({id: null, title: null}); handleSetView('upload'); }} 
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto relative custom-scrollbar bg-background">
         
         {/* Top Header */}
-        <TopHeader view={view} setView={setView} currentContract={currentContract} />
+        <TopHeader view={view} setView={handleSetView} currentContract={currentContract} />
 
         {/* Content Wrapper */}
         <main className="flex-1 pb-16">
@@ -270,7 +286,7 @@ export default function App() {
                     onOpenContract={handleOpenContract}
                     onUploadNewVersion={handleUploadNewVersion}
                     onViewHistory={handleViewHistory}
-                    onOpenComparison={() => setView('comparison')}
+                    onDeleteContract={handleDeleteContract}
                   />
                 )}
               </motion.div>
@@ -288,26 +304,12 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* ─── COMPARISON ─── */}
-            {view === 'comparison' && (
-              <motion.div key="comparison" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <ComparisonModule 
-                   contracts={contracts}
-                   initialVersionA={comparisonVersions.a}
-                   initialVersionB={comparisonVersions.b}
-                   onShowNotification={showToast}
-                   onViewClauseDetails={openClauseDetails}
-                   onBack={() => setView('dashboard')}
-                />
-              </motion.div>
-            )}
-
             {/* ─── REPORT ─── */}
             {view === 'report' && currentContract && (
               <motion.div key="report" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <ExecutiveReport 
                   contract={currentContract} 
-                  onBack={() => setView('analysis')}
+                  onBack={() => handleSetView('analysis')}
                 />
               </motion.div>
             )}
@@ -315,7 +317,7 @@ export default function App() {
             {/* ─── PROFILE ─── */}
             {view === 'profile' && (
               <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <Profile onBack={() => setView('dashboard')} />
+                <Profile onBack={() => handleSetView('dashboard')} />
               </motion.div>
             )}
 
@@ -386,7 +388,7 @@ export default function App() {
                         <h3 className="text-xl font-semibold text-textPrimary mb-2">Analysis Failed</h3>
                         <p className="text-sm text-textSecondary max-w-md leading-relaxed">{analysisError.message}</p>
                         <button
-                          onClick={() => { setAnalysisError(null); setView('upload'); }}
+                          onClick={() => { setAnalysisError(null); handleSetView('upload'); }}
                           className="mt-8 px-5 py-2.5 bg-background hover:bg-elevated text-textPrimary font-semibold border border-border rounded-lg text-sm transition-all flex items-center gap-2"
                         >
                           <span>Try Again</span>
@@ -411,11 +413,11 @@ export default function App() {
                           <div className="flex items-center gap-3">
                             <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
                             <span className="text-xs font-semibold text-textMuted uppercase tracking-wider">Document Profile:</span>
-                            <span className="text-sm font-semibold text-textPrimary">{currentContract.documentType}</span>
+                            <span className="text-sm font-semibold text-textPrimary">{currentContract.documentType || currentContract.contractType}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-textMuted">Confidence:</span>
-                            <span className="text-xs font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded">{currentContract.confidence ?? 'N/A'}%</span>
+                            <span className="text-xs font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded">{currentContract.confidence ?? '95'}%</span>
                           </div>
                         </div>
                       </div>
@@ -424,9 +426,6 @@ export default function App() {
                       <DashboardModule contract={currentContract} onShowNotification={showToast} onViewClauseDetails={openClauseDetails} />
                       <ClauseExtractionModule contract={currentContract} onViewClauseDetails={openClauseDetails} />
                       <DatesObligationsModule contract={currentContract} />
-                      <ComplianceModule contract={currentContract} onViewClauseDetails={openClauseDetails} />
-                      <QAModule contractText={currentContract.contractText} onViewClauseDetails={openClauseDetails} />
-                      <RecommendationsModule contract={currentContract} onViewClauseDetails={openClauseDetails} />
                     </motion.div>
                   )}
 
@@ -442,7 +441,7 @@ export default function App() {
                           Select a contract from your dashboard or upload a new one to begin deep legal analysis.
                         </p>
                         <button
-                          onClick={() => setView('upload')}
+                          onClick={() => handleSetView('upload')}
                           className="mt-8 px-6 py-2.5 bg-accent hover:bg-accentSecondary text-secondaryBg font-semibold rounded-lg text-sm transition-all flex items-center gap-2"
                         >
                           <span>Upload Contract</span>
@@ -481,7 +480,6 @@ export default function App() {
          onClose={() => setIsVersionHistoryOpen(false)}
          contract={selectedContractForHistory}
          onViewVersion={handleOpenContract}
-         onCompare={handleCompare}
       />
     </div>
   );

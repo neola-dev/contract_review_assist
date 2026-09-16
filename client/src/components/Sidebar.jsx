@@ -68,15 +68,6 @@ export default function Sidebar({ view, currentContract, setView, onUploadNew })
               <button onClick={() => scrollTo('dates-module')} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-textSecondary hover:text-textPrimary transition-all relative z-10">
                 <span className="w-2 h-2 rounded-full bg-border mr-1" /> Dates & Obligations
               </button>
-              <button onClick={() => scrollTo('compliance-module')} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-textSecondary hover:text-textPrimary transition-all relative z-10">
-                <span className="w-2 h-2 rounded-full bg-border mr-1" /> Compliance
-              </button>
-              <button onClick={() => scrollTo('qa-module')} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-textSecondary hover:text-textPrimary transition-all relative z-10">
-                <span className="w-2 h-2 rounded-full bg-border mr-1" /> AI Chat
-              </button>
-              <button onClick={() => scrollTo('recommendations-module')} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-textSecondary hover:text-textPrimary transition-all relative z-10">
-                <span className="w-2 h-2 rounded-full bg-border mr-1" /> Negotiation
-              </button>
             </nav>
           </div>
         )}

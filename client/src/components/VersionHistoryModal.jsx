@@ -1,8 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, History, FileText, AlertTriangle, ShieldCheck, ArrowRightLeft } from 'lucide-react';
+import { X, History, FileText, AlertTriangle, ShieldCheck, Loader2 } from 'lucide-react';
+import { contractApi } from '../services/api';
 
-export default function VersionHistoryModal({ isOpen, onClose, contract, onViewVersion, onCompare }) {
+export default function VersionHistoryModal({ isOpen, onClose, contract, onViewVersion }) {
+  const [versions, setVersions] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const contractId = contract?._id || contract?.id;
+
+  useEffect(() => {
+    const fetchVersions = async () => {
+      if (!isOpen || !contractId) return;
+      setLoading(true);
+      try {
+        const data = await contractApi.getVersions(contractId);
+        if (Array.isArray(data)) {
+          setVersions(data);
+        } else if (contract.versions) {
+          setVersions(contract.versions);
+        }
+      } catch (err) {
+        console.error('Failed to fetch versions:', err);
+        if (contract.versions) {
+          setVersions(contract.versions);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVersions();
+  }, [isOpen, contractId]);
+
   if (!isOpen || !contract) return null;
 
   return (
@@ -45,70 +75,74 @@ export default function VersionHistoryModal({ isOpen, onClose, contract, onViewV
 
           {/* Content */}
           <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-background/30">
-            <div className="space-y-4 relative">
-              {/* Timeline line */}
-              <div className="absolute left-6 top-4 bottom-4 w-px bg-border z-0" />
+            {loading ? (
+              <div className="py-12 text-center flex flex-col items-center justify-center">
+                <Loader2 className="w-6 h-6 text-accent animate-spin mb-2" />
+                <span className="text-xs text-textMuted font-medium">Loading version history...</span>
+              </div>
+            ) : versions.length === 0 ? (
+              <div className="py-12 text-center text-sm text-textMuted">
+                No versions found for this contract.
+              </div>
+            ) : (
+              <div className="space-y-4 relative">
+                {/* Timeline line */}
+                <div className="absolute left-6 top-4 bottom-4 w-px bg-border z-0" />
 
-              {contract.versions.map((version, index) => {
-                const isCurrent = index === 0;
-                const riskColor = version.riskLevel === 'High' ? 'text-danger bg-danger/10 border-danger/20' :
-                                  version.riskLevel === 'Medium' ? 'text-warning bg-warning/10 border-warning/20' : 'text-success bg-success/10 border-success/20';
-                const previousVersion = contract.versions[index + 1];
+                {versions.map((version, index) => {
+                  const isCurrent = index === 0;
+                  const versionId = version._id || version.id;
+                  const riskLevel = version.riskLevel || 'Low';
+                  const riskScore = version.riskScore ?? 0;
+                  const riskColor = riskLevel === 'High' ? 'text-danger bg-danger/10 border-danger/20' :
+                                    riskLevel === 'Medium' ? 'text-warning bg-warning/10 border-warning/20' : 'text-success bg-success/10 border-success/20';
 
-                return (
-                  <div key={version.id} className="relative z-10 flex gap-4">
-                    {/* Node */}
-                    <div className="flex-shrink-0 w-12 flex flex-col items-center">
-                      <div className={`w-4 h-4 rounded-full border-[3px] border-elevated mt-1 shadow-sm ${isCurrent ? 'bg-accent' : 'bg-border'}`} />
-                    </div>
+                  return (
+                    <div key={versionId || index} className="relative z-10 flex gap-4">
+                      {/* Node */}
+                      <div className="flex-shrink-0 w-12 flex flex-col items-center">
+                        <div className={`w-4 h-4 rounded-full border-[3px] border-elevated mt-1 shadow-sm ${isCurrent ? 'bg-accent' : 'bg-border'}`} />
+                      </div>
 
-                    {/* Card */}
-                    <div className={`flex-1 p-5 rounded-xl border transition-all ${isCurrent ? 'bg-card border-accent/40 shadow-sm ring-1 ring-accent/10' : 'bg-card border-border/50'}`}>
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-bold text-textPrimary">
-                              Version {version.versionNumber}
-                            </h3>
-                            {isCurrent && (
-                              <span className="px-2 py-0.5 bg-accent text-secondaryBg text-[10px] font-bold uppercase rounded-full tracking-wide">
-                                Current
-                              </span>
-                            )}
+                      {/* Card */}
+                      <div className={`flex-1 p-5 rounded-xl border transition-all ${isCurrent ? 'bg-card border-accent/40 shadow-sm ring-1 ring-accent/10' : 'bg-card border-border/50'}`}>
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-bold text-textPrimary">
+                                Version {version.versionNumber}
+                              </h3>
+                              {isCurrent && (
+                                <span className="px-2 py-0.5 bg-accent text-secondaryBg text-[10px] font-bold uppercase rounded-full tracking-wide">
+                                  Current
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-textMuted mt-1">
+                              File: <span className="font-semibold text-textSecondary">{version.fileName}</span> · Uploaded on {new Date(version.uploadedAt).toLocaleDateString()}
+                            </p>
                           </div>
-                          <p className="text-xs text-textMuted mt-1">
-                            Uploaded on {new Date(version.uploadedAt).toLocaleDateString()}
-                          </p>
+                          <div className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1.5 ${riskColor}`}>
+                            {riskLevel === 'High' ? <AlertTriangle className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                            Risk: {riskScore}
+                          </div>
                         </div>
-                        <div className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1.5 ${riskColor}`}>
-                          {version.riskLevel === 'High' ? <AlertTriangle className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                          Risk: {version.riskScore}
-                        </div>
-                      </div>
 
-                      <div className="flex items-center gap-2 mt-5 pt-4 border-t border-border">
-                        <button
-                          onClick={() => { onClose(); onViewVersion(contract.id, version.id); }}
-                          className="px-4 py-2 bg-background border border-border hover:bg-border text-textSecondary font-semibold rounded-lg text-sm transition-all"
-                        >
-                          View Report
-                        </button>
-                        
-                        {previousVersion && (
+                        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-border">
                           <button
-                            onClick={() => { onClose(); onCompare(version.id, previousVersion.id); }}
-                            className="px-4 py-2 bg-card border border-border hover:bg-border text-textSecondary font-semibold rounded-lg text-sm transition-all flex items-center gap-2"
+                            onClick={() => { onClose(); onViewVersion(contractId, versionId); }}
+                            className="px-4 py-2 bg-background border border-border hover:bg-border text-textSecondary font-semibold rounded-lg text-sm transition-all flex items-center gap-1.5"
                           >
-                            <ArrowRightLeft className="w-4 h-4" />
-                            Compare with V{previousVersion.versionNumber}
+                            <FileText className="w-4 h-4 text-accent" />
+                            <span>View Analysis Report</span>
                           </button>
-                        )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </motion.div>
       </div>

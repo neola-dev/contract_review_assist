@@ -8,7 +8,6 @@ export default function TopHeader({ view, setView, currentContract }) {
   const getBreadcrumbs = () => {
     if (view === 'dashboard') return 'Workspace / Dashboard';
     if (view === 'upload') return 'Workspace / New Contract Upload';
-    if (view === 'comparison') return 'Workspace / Contract Comparison';
     if (view === 'report') return `Workspace / ${currentContract?.title || 'Contract'} / Executive Report`;
     if (view === 'analysis' && currentContract) return `Workspace / ${currentContract.title} / Version ${currentContract.versionNumber || '1'}`;
     return 'Workspace';

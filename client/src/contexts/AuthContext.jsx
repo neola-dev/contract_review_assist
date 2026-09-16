@@ -1,81 +1,73 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { authApi, getToken, clearAuthData } from '../services/api';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [token, setToken] = useState(getToken());
   const [loading, setLoading] = useState(true);
-  
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
+  useEffect(() => {
+    const handleExpired = () => {
+      setToken(null);
+      setUser(null);
+    };
+
+    window.addEventListener('auth:expired', handleExpired);
+    return () => window.removeEventListener('auth:expired', handleExpired);
+  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {
-      if (!token) {
+      const currentToken = getToken();
+      if (!currentToken) {
+        setUser(null);
         setLoading(false);
         return;
       }
       try {
-        const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-        } else {
-          // Token invalid or expired
-          setToken(null);
-          localStorage.removeItem('token');
-          setUser(null);
-        }
+        const data = await authApi.getMe();
+        setUser(data.user);
+        setToken(currentToken);
       } catch (error) {
-        console.error("Failed to verify session:", error);
+        console.error('Failed to verify session:', error);
+        clearAuthData();
+        setToken(null);
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
+
     fetchUser();
-  }, [token, BACKEND_URL]);
+  }, [token]);
 
   const login = async (email, password) => {
-    const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    
-    const data = await res.json();
-    if (res.ok) {
+    try {
+      const data = await authApi.login({ email, password });
       setToken(data.token);
-      localStorage.setItem('token', data.token);
       setUser(data.user);
       return { success: true };
+    } catch (error) {
+      return { success: false, message: error.message || 'Login failed' };
     }
-    return { success: false, message: data.message || 'Login failed' };
   };
 
   const register = async (name, email, password, company) => {
-    const res = await fetch(`${BACKEND_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, company })
-    });
-    
-    const data = await res.json();
-    if (res.ok) {
+    try {
+      const data = await authApi.register({ name, email, password, company });
       setToken(data.token);
-      localStorage.setItem('token', data.token);
       setUser(data.user);
       return { success: true };
+    } catch (error) {
+      return { success: false, message: error.message || 'Registration failed' };
     }
-    return { success: false, message: data.message || 'Registration failed' };
   };
 
   const logout = () => {
+    clearAuthData();
     setToken(null);
-    localStorage.removeItem('token');
     setUser(null);
   };
 
