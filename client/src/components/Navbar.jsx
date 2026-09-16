@@ -22,7 +22,7 @@ export default function Navbar({ onShowNotification }) {
             </div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-textPrimary via-textSecondary to-accent bg-clip-text text-transparent">
-                Contract Review Assist
+                Lexora AI
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-accent/10 text-accent border border-accent/20">
                 <Sparkles className="w-3 h-3 text-accent animate-pulse" />

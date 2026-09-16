@@ -27,7 +27,7 @@ export default function Hero({ onScrollToUpload }) {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-textPrimary max-w-4xl mx-auto leading-[1.15]"
         >
-          AI Contract <span className="bg-gradient-to-r from-accent via-accentSecondary to-accent bg-clip-text text-transparent">Review Assist</span>
+          <span className="bg-gradient-to-r from-accent via-accentSecondary to-accent bg-clip-text text-transparent">Lexora AI</span>
         </motion.h1>
 
         {/* Subtitle */}

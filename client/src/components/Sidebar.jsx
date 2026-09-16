@@ -21,7 +21,7 @@ export default function Sidebar({ view, currentContract, setView, onUploadNew })
       <div className="h-16 flex items-center px-6 border-b border-border">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-6 h-6 text-accent" />
-          <span className="font-bold text-textPrimary tracking-tight">Contract Assist</span>
+          <span className="font-bold text-textPrimary tracking-tight">Lexora AI</span>
         </div>
       </div>
 

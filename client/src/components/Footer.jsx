@@ -13,10 +13,10 @@ export default function Footer() {
             </div>
             <div>
               <span className="font-bold text-base text-textPrimary tracking-tight">
-                Contract Review Assist
+                Lexora AI
               </span>
               <p className="text-[11px] text-textMuted font-semibold tracking-wider uppercase mt-0.5">
-                AI Powered Legal Compliance Assistant
+                An Intelligent Contract Review Assistant
               </p>
             </div>
           </div>

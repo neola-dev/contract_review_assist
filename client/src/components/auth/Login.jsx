@@ -37,9 +37,9 @@ export default function Login({ onNavigate }) {
             <div className="p-4 bg-accent/10 rounded-2xl shadow-inner border border-accent/20">
               <ShieldCheck className="w-10 h-10 text-accent" />
             </div>
-            <h1 className="text-4xl font-bold text-textPrimary tracking-tight">Contract Assist</h1>
+            <h1 className="text-4xl font-bold text-textPrimary tracking-tight">Lexora AI</h1>
           </div>
-          <h2 className="text-3xl font-bold text-textPrimary mb-6 leading-tight">Contract intelligence,<br/>powered by AI.</h2>
+          <h2 className="text-3xl font-bold text-textPrimary mb-6 leading-tight">An Intelligent Contract Review Assistant</h2>
           <p className="text-textSecondary leading-relaxed text-lg">
             Analyze, understand and manage your contracts with confidence. Secure your data with your own isolated workspace.
           </p>
@@ -56,7 +56,7 @@ export default function Login({ onNavigate }) {
             <div className="p-2 bg-accent/10 rounded-xl">
               <ShieldCheck className="w-6 h-6 text-accent" />
             </div>
-            <h1 className="text-2xl font-bold text-textPrimary">Contract Assist</h1>
+            <h1 className="text-2xl font-bold text-textPrimary">Lexora AI</h1>
           </div>
           
           <h2 className="text-3xl font-bold text-textPrimary mb-3">Welcome back</h2>

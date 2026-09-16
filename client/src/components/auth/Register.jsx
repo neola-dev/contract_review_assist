@@ -39,9 +39,9 @@ export default function Register({ onNavigate }) {
             <div className="p-4 bg-accent/10 rounded-2xl shadow-inner border border-accent/20">
               <ShieldCheck className="w-10 h-10 text-accent" />
             </div>
-            <h1 className="text-4xl font-bold text-textPrimary tracking-tight">Contract Assist</h1>
+            <h1 className="text-4xl font-bold text-textPrimary tracking-tight">Lexora AI</h1>
           </div>
-          <h2 className="text-3xl font-bold text-textPrimary mb-6 leading-tight">Start your free workspace.</h2>
+          <h2 className="text-3xl font-bold text-textPrimary mb-6 leading-tight">An Intelligent Contract Review Assistant</h2>
           <p className="text-textSecondary leading-relaxed text-lg">
             Upload your contracts, identify risks instantly, and ensure compliance without the hefty legal fees.
           </p>
@@ -58,7 +58,7 @@ export default function Register({ onNavigate }) {
             <div className="p-2 bg-accent/10 rounded-xl">
               <ShieldCheck className="w-6 h-6 text-accent" />
             </div>
-            <h1 className="text-2xl font-bold text-textPrimary">Contract Assist</h1>
+            <h1 className="text-2xl font-bold text-textPrimary">Lexora AI</h1>
           </div>
 
           <h2 className="text-3xl font-bold text-textPrimary mb-3">Create an account</h2>
