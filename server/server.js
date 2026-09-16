@@ -21,7 +21,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://lexora-ai-app.vercel.app/",
+      "https://lexora-ai-app.vercel.app",
     ],
     credentials: true,
   })
