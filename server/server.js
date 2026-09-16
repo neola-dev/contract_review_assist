@@ -17,7 +17,16 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://YOUR-FRONTEND.vercel.app",
+    ],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 app.use(
@@ -26,34 +35,21 @@ app.use(
   swaggerUi.setup(swaggerSpec)
 );
 
-// Existing API routes
 app.use("/api/auth", authRoutes);
 
-app.use(
-  "/api/contracts",
-  contractRoutes
-);
+app.use("/api/contracts", contractRoutes);
 
-app.use(
-  "/api/contracts",
-  reportRoutes
-);
+app.use("/api/contracts", reportRoutes);
 
-app.use(
-  "/api/versions",
-  versionRoutes
-);
+app.use("/api/versions", versionRoutes);
 
-app.use(
-  "/api/analyze",
-  analysisRoutes
-);
+app.use("/api/analyze", analysisRoutes);
 
 const PORT = process.env.PORT || 3001;
 
 connectDB()
   .then(() => {
-    app.listen(PORT, () => {
+    app.listen(PORT, "0.0.0.0", () => {
       console.log(
         `Contract Analysis server running on port ${PORT}`
       );
